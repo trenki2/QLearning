@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Xml.Schema;
@@ -9,10 +10,54 @@ namespace QLearning
     {
         static void Main(string[] args)
         {
+            Test2();
+        }
+
+        private static void Test2()
+        {
+            var random = new Random();
+
+            var table = new QTable(720, 3);
+            var learner = new QLearner(table, QAlgorithm.Sarsa);
+
+            learner.Temperature = 1;
+            learner.Alpha = 0.5;
+            learner.Gamma = 0.99;
+            learner.Lambda = 0.5;
+
+            var reward = new QTable(720, 3);
+            for (int state = 0; state < 720; state++)
+            {
+                var action = random.Next(2);
+                reward[state, action] = 1.0;
+            }
+
+            for (var epoch = 0; epoch < 100; epoch++)
+            {
+                learner.ResetState(0);
+                learner.Epsilon = 1 - epoch / 100.0;
+                
+                var action = learner.GetPolicyAction(0);
+                var cumulativeReward = 0.0;
+
+                for (var state = 0; state < 720 - 1; state++)
+                {
+                    cumulativeReward += reward[state, action];
+                    action = learner.Learn(state, action, reward[state, action], state + 1);
+                }
+
+                Console.WriteLine($"{cumulativeReward / table.GetStateCount():0.000}");
+            }
+
+            Console.ReadLine();
+        }
+
+        private static void Test1()
+        {
             var sw = Stopwatch.StartNew();
 
             var random = new Random();
-           
+
             var table = new QTable(16, 16);
             var learner = new QLearner(table, QAlgorithm.Sarsa);
             learner.Random = random;
@@ -80,7 +125,7 @@ namespace QLearning
                 }
 
                 alphaAction = alphaLearner.Learn(alphaLearner.CurrentState, alphaAction, epochReward / steps, alphaLearner.CurrentState);
-                
+
                 switch (alphaAction)
                 {
                     case 0: learner.Alpha = 0.01; break;
