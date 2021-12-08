@@ -43,8 +43,8 @@ namespace QLearning
         public void ResetTraces()
         {
             for (var s = 0; s < numStates; s++)
-                for (var a = 0; a < numActions; a++)
-                    Traces[s, a] = 0.0;
+            for (var a = 0; a < numActions; a++)
+                Traces[s, a] = 0.0;
         }
 
         public int GetGreedyAction(int state)
