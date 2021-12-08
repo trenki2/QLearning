@@ -9,7 +9,7 @@ namespace QLearning
         public double[,] QTable { get; set; }
         public double[,] Traces { get; set; }
         public QAlgorithm Algorithm { get; set; }
-        public Random Random { get; set; } = new();
+        public Random Random { get; set; }
 
         public double Gamma { get; set; } = 0.9;
         public double Alpha { get; set; } = 0.01;
@@ -21,12 +21,13 @@ namespace QLearning
         private readonly int numStates;
         private readonly int numActions;
 
-        public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, bool traces = false)
+        public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, bool traces = false, Random random = null)
         {
-            UseTraces = traces;
             QTable = qtable;
-            Traces = new double[qtable.GetLength(0), qtable.GetLength(1)];
             Algorithm = algorithm;
+            UseTraces = traces;
+            Random = random ?? new Random();
+            Traces = new double[qtable.GetLength(0), qtable.GetLength(1)];
             CurrentState = 0;
 
             numStates = qtable.GetLength(0);
