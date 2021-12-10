@@ -93,7 +93,7 @@ namespace QLearning
                         for (var a = 0; a < numActions; a++)
                         {
                             QTable[s, a] += Alpha * delta * Traces[s, a];
-                            Traces[s, a] = Lambda * Gamma * Traces[s, a];
+                            Traces[s, a] = updateAction == policyAction ? Lambda * Gamma * Traces[s, a] : 0;
                         }
                     });
                 }
@@ -104,7 +104,7 @@ namespace QLearning
                         for (var s = 0; s < numStates; a++)
                         {
                             QTable[s, a] += Alpha * delta * Traces[s, a];
-                            Traces[s, a] = Lambda * Gamma * Traces[s, a];
+                            Traces[s, a] = updateAction == policyAction ? Lambda * Gamma * Traces[s, a] : 0;
                         }
                     });
                 }
