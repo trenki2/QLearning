@@ -81,14 +81,27 @@ namespace QLearning
             var policyAction = GetPolicyAction(nextState);
             var updateAction = Algorithm == QAlgorithm.Q ? greedyAction : policyAction;
             var delta = reward + Gamma * QTable[nextState, updateAction] - QTable[state, action];
+            var decay = updateAction == policyAction ? Lambda * Gamma : 0;
 
+            Act(state, action);
+            Update(state, action, delta, decay);
+
+            CurrentState = nextState;
+            return policyAction;
+        }
+
+        private void Act(int state, int action)
+        {
+            if (TraceType == TraceType.Replacing)
+                Traces[state, action] = 1;
+            else if (TraceType == TraceType.Accumulating)
+                Traces[state, action] += 1;
+        }
+
+        private void Update(int state, int action, double delta, double decay)
+        {
             if (TraceType != TraceType.None)
             {
-                if (TraceType == TraceType.Replacing)
-                    Traces[state, action] = 1;
-                else if (TraceType == TraceType.Accumulating)
-                    Traces[state, action] += 1;
-
                 if (numStates > numActions)
                 {
                     Parallel.For(0, numStates, s =>
@@ -96,7 +109,7 @@ namespace QLearning
                         for (var a = 0; a < numActions; a++)
                         {
                             QTable[s, a] += Alpha * delta * Traces[s, a];
-                            Traces[s, a] = updateAction == policyAction ? Lambda * Gamma * Traces[s, a] : 0;
+                            Traces[s, a] = decay * Traces[s, a];
                         }
                     });
                 }
@@ -107,7 +120,7 @@ namespace QLearning
                         for (var s = 0; s < numStates; a++)
                         {
                             QTable[s, a] += Alpha * delta * Traces[s, a];
-                            Traces[s, a] = updateAction == policyAction ? Lambda * Gamma * Traces[s, a] : 0;
+                            Traces[s, a] = decay * Traces[s, a];
                         }
                     });
                 }
@@ -116,9 +129,11 @@ namespace QLearning
             {
                 QTable[state, action] += Alpha * delta;
             }
+        }
 
-            CurrentState = nextState;
-            return policyAction;
+        public void Reward(int state, int action, double reward)
+        {
+            Update(state, action, reward, 1.0);
         }
     }
 }
