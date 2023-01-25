@@ -16,7 +16,7 @@ namespace QLearning
             var random = new Random();
 
             var table = new double[720, 3];
-            var agent = new QAgent(table, QAlgorithm.Sarsa, traces: false);
+            var agent = new QAgent(table, QAlgorithm.Sarsa);
 
             agent.Alpha = 0.5;
             agent.Gamma = 0.99;

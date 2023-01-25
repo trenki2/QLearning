@@ -5,10 +5,10 @@ namespace QLearning
 {
     public class QAgent
     {
-        public bool UseTraces { get; set; }
         public double[,] QTable { get; set; }
         public double[,] Traces { get; set; }
         public QAlgorithm Algorithm { get; set; }
+        public TraceType TraceType { get; set; }
         public Random Random { get; set; }
 
         public double Gamma { get; set; } = 0.9;
@@ -21,11 +21,11 @@ namespace QLearning
         private readonly int numStates;
         private readonly int numActions;
 
-        public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, bool traces = false, Random random = null)
+        public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, TraceType traceType = TraceType.None, Random random = null)
         {
             QTable = qtable;
             Algorithm = algorithm;
-            UseTraces = traces;
+            TraceType = traceType;
             Random = random ?? new Random();
             Traces = new double[qtable.GetLength(0), qtable.GetLength(1)];
             CurrentState = 0;
@@ -37,7 +37,7 @@ namespace QLearning
         public void Reset(int state)
         {
             CurrentState = state;
-            if (UseTraces)
+            if (TraceType != TraceType.None)
                 ResetTraces();
         }
 
@@ -74,7 +74,7 @@ namespace QLearning
 
         public int Step(int state, int action, double reward, int nextState)
         {
-            if (state != CurrentState && UseTraces)
+            if (state != CurrentState && TraceType != TraceType.None)
                 ResetTraces();
 
             var greedyAction = GetGreedyAction(nextState);
@@ -82,9 +82,12 @@ namespace QLearning
             var updateAction = Algorithm == QAlgorithm.Q ? greedyAction : policyAction;
             var delta = reward + Gamma * QTable[nextState, updateAction] - QTable[state, action];
 
-            if (UseTraces)
+            if (TraceType != TraceType.None)
             {
-                Traces[state, action] = 1;
+                if (TraceType == TraceType.Replacing)
+                    Traces[state, action] = 1;
+                else if (TraceType == TraceType.Accumulating)
+                    Traces[state, action] += 1;
 
                 if (numStates > numActions)
                 {
