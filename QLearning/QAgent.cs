@@ -10,11 +10,14 @@ namespace QLearning
         public QAlgorithm Algorithm { get; set; }
         public TraceType TraceType { get; set; }
         public Random Random { get; set; }
+        public bool UseParallelFor { get; set; } = true;
 
         public double Gamma { get; set; } = 0.9;
         public double Alpha { get; set; } = 0.01;
         public double Lambda { get; set; } = 0.1;
         public double Epsilon { get; set; } = 0.01;
+
+        
 
         public int CurrentState { get; private set; }
 
@@ -102,27 +105,41 @@ namespace QLearning
         {
             if (TraceType != TraceType.None)
             {
-                if (numStates > numActions)
+                if (UseParallelFor)
                 {
-                    Parallel.For(0, numStates, s =>
+                    if (numStates > numActions)
+                    {
+                        Parallel.For(0, numStates, s =>
+                        {
+                            for (var a = 0; a < numActions; a++)
+                            {
+                                QTable[s, a] += Alpha * delta * Traces[s, a];
+                                Traces[s, a] = decay * Traces[s, a];
+                            }
+                        });
+                    }
+                    else
+                    {
+                        Parallel.For(0, numActions, a =>
+                        {
+                            for (var s = 0; s < numStates; s++)
+                            {
+                                QTable[s, a] += Alpha * delta * Traces[s, a];
+                                Traces[s, a] = decay * Traces[s, a];
+                            }
+                        });
+                    }
+                }
+                else
+                {
+                    for (var s = 0; s < numStates; s++)
                     {
                         for (var a = 0; a < numActions; a++)
                         {
                             QTable[s, a] += Alpha * delta * Traces[s, a];
                             Traces[s, a] = decay * Traces[s, a];
                         }
-                    });
-                }
-                else
-                {
-                    Parallel.For(0, numActions, a =>
-                    {
-                        for (var s = 0; s < numStates; a++)
-                        {
-                            QTable[s, a] += Alpha * delta * Traces[s, a];
-                            Traces[s, a] = decay * Traces[s, a];
-                        }
-                    });
+                    }
                 }
             }
             else
