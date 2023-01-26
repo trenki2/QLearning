@@ -17,8 +17,6 @@ namespace QLearning
         public double Lambda { get; set; } = 0.1;
         public double Epsilon { get; set; } = 0.01;
 
-
-
         public int CurrentState { get; private set; }
 
         private readonly int numStates;
