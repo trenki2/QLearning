@@ -17,7 +17,7 @@ namespace QLearning
         public double Lambda { get; set; } = 0.1;
         public double Epsilon { get; set; } = 0.01;
 
-        
+
 
         public int CurrentState { get; private set; }
 
@@ -114,7 +114,7 @@ namespace QLearning
                             for (var a = 0; a < numActions; a++)
                             {
                                 QTable[s, a] += Alpha * delta * Traces[s, a];
-                                Traces[s, a] = decay * Traces[s, a];
+                                Traces[s, a] *= decay;
                             }
                         });
                     }
@@ -125,7 +125,7 @@ namespace QLearning
                             for (var s = 0; s < numStates; s++)
                             {
                                 QTable[s, a] += Alpha * delta * Traces[s, a];
-                                Traces[s, a] = decay * Traces[s, a];
+                                Traces[s, a] *= decay;
                             }
                         });
                     }
@@ -137,7 +137,7 @@ namespace QLearning
                         for (var a = 0; a < numActions; a++)
                         {
                             QTable[s, a] += Alpha * delta * Traces[s, a];
-                            Traces[s, a] = decay * Traces[s, a];
+                            Traces[s, a] *= decay;
                         }
                     }
                 }
