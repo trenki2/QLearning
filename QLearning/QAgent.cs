@@ -1,52 +1,42 @@
 ﻿using System;
-using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace QLearning
 {
     public class QAgent
     {
         public double[,] QTable { get; set; }
-        public double[,] Traces { get; set; }
+        public Dictionary<(int State, int Action), double> Traces { get; set; } = new();
         public QAlgorithm Algorithm { get; set; }
         public TraceType TraceType { get; set; }
+        public double TraceThreshold { get; set; } = 1e-4;
         public Random Random { get; set; }
-        public bool UseParallelFor { get; set; } = true;
 
-        public double Gamma { get; set; } = 0.9;
+        public double Gamma { get; set; } = 0.99;
+        public double Lambda { get; set; } = 0.99;
         public double Alpha { get; set; } = 0.01;
-        public double Lambda { get; set; } = 0.1;
         public double Epsilon { get; set; } = 0.01;
 
         public int CurrentState { get; private set; }
 
-        private readonly int numStates;
         private readonly int numActions;
+        private int updateCount;
 
-        public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, TraceType traceType = TraceType.None, Random random = null)
+        public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, TraceType traceType = TraceType.Replacing, Random random = null)
         {
             QTable = qtable;
             Algorithm = algorithm;
             TraceType = traceType;
             Random = random ?? new Random();
-            Traces = new double[qtable.GetLength(0), qtable.GetLength(1)];
             CurrentState = 0;
-
-            numStates = qtable.GetLength(0);
             numActions = qtable.GetLength(1);
         }
 
         public void Reset(int state)
         {
             CurrentState = state;
-            if (TraceType != TraceType.None)
-                ResetTraces();
-        }
-
-        public void ResetTraces()
-        {
-            for (var s = 0; s < numStates; s++)
-            for (var a = 0; a < numActions; a++)
-                Traces[s, a] = 0.0;
+            Traces.Clear();
         }
 
         public int GetGreedyAction(int state)
@@ -66,20 +56,20 @@ namespace QLearning
             return bestAction;
         }
 
-        public int GetPolicyAction(int state)
+        public int GetPolicyAction(int state, int? greedyAction = null)
         {
             if (Random.NextDouble() < Epsilon)
                 return Random.Next(numActions);
-            return GetGreedyAction(state);
+            return greedyAction ?? GetGreedyAction(state);
         }
 
         public int Step(int state, int action, double reward, int nextState)
         {
             if (state != CurrentState && TraceType != TraceType.None)
-                ResetTraces();
+                Traces.Clear();
 
             var greedyAction = GetGreedyAction(nextState);
-            var policyAction = GetPolicyAction(nextState);
+            var policyAction = GetPolicyAction(nextState, greedyAction);
             var updateAction = Algorithm == QAlgorithm.Q ? greedyAction : policyAction;
             var delta = reward + Gamma * QTable[nextState, updateAction] - QTable[state, action];
             var decay = updateAction == policyAction ? Lambda * Gamma : 0;
@@ -94,55 +84,34 @@ namespace QLearning
         private void Act(int state, int action)
         {
             if (TraceType == TraceType.Replacing)
-                Traces[state, action] = 1;
+            {
+                Traces[(state, action)] = 1;
+            }
             else if (TraceType == TraceType.Accumulating)
-                Traces[state, action] += 1;
+            {
+                Traces.TryGetValue((state, action), out var val);
+                Traces[(state, action)] = val + 1;
+            }
         }
 
         private void Update(int state, int action, double delta, double decay)
         {
-            if (TraceType != TraceType.None)
-            {
-                if (UseParallelFor)
-                {
-                    if (numStates > numActions)
-                    {
-                        Parallel.For(0, numStates, s =>
-                        {
-                            for (var a = 0; a < numActions; a++)
-                            {
-                                QTable[s, a] += Alpha * delta * Traces[s, a];
-                                Traces[s, a] *= decay;
-                            }
-                        });
-                    }
-                    else
-                    {
-                        Parallel.For(0, numActions, a =>
-                        {
-                            for (var s = 0; s < numStates; s++)
-                            {
-                                QTable[s, a] += Alpha * delta * Traces[s, a];
-                                Traces[s, a] *= decay;
-                            }
-                        });
-                    }
-                }
-                else
-                {
-                    for (var s = 0; s < numStates; s++)
-                    {
-                        for (var a = 0; a < numActions; a++)
-                        {
-                            QTable[s, a] += Alpha * delta * Traces[s, a];
-                            Traces[s, a] *= decay;
-                        }
-                    }
-                }
-            }
-            else
+            if (TraceType == TraceType.None)
             {
                 QTable[state, action] += Alpha * delta;
+                return;
+            }
+
+            foreach (var key in Traces.Keys)
+            {
+                QTable[key.State, key.Action] += Alpha * delta * Traces[key];
+                Traces[key] *= decay;
+            }
+
+            if (++updateCount % 100 == 0)
+            {
+                foreach (var key in Traces.Where(x => x.Value < TraceThreshold).Select(x => x.Key).ToArray())
+                    Traces.Remove(key);
             }
         }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading.Tasks.Sources;
 
 namespace QLearning
 {
@@ -7,10 +8,11 @@ namespace QLearning
     {
         private static void Main(string[] args)
         {
-            Test();
+            //Test1();
+            Test2();
         }
 
-        private static void Test()
+        private static void Test1()
         {
             var sw = Stopwatch.StartNew();
             var random = new Random();
@@ -44,6 +46,25 @@ namespace QLearning
                 }
 
                 Console.WriteLine($"{cumulativeReward / table.GetLength(0):0.000}");
+            }
+
+            Console.WriteLine(sw.ElapsedMilliseconds);
+        }
+
+        private static void Test2()
+        {
+            var table = new double[2000, 10000];
+            var agent = new QAgent(table, QAlgorithm.Sarsa, TraceType.Replacing) { Gamma = 0.99, Lambda = 0.99 };
+            var random = new Random();
+
+            var sw = Stopwatch.StartNew();
+            var state = 0;
+            var action = 0;
+            for (int i = 0; i < 100000; i++)
+            {
+                var nextState = random.Next(table.GetLength(0));
+                action = agent.Step(state, action, 0, nextState);
+                state = nextState;
             }
 
             Console.WriteLine(sw.ElapsedMilliseconds);
