@@ -20,8 +20,11 @@ namespace QLearning
 
         public int CurrentState { get; private set; }
 
-        private readonly int numActions;
+        public int NumStates { get; private set; }
+        public int NumActions { get; private set; }
+
         private int updateCount;
+        private (int Action, double QValue)[] bestActions;
 
         public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, TraceType traceType = TraceType.Replacing, Random random = null)
         {
@@ -30,7 +33,9 @@ namespace QLearning
             TraceType = traceType;
             Random = random ?? new Random();
             CurrentState = 0;
-            numActions = qtable.GetLength(1);
+            NumStates = qtable.GetLength(0);
+            NumActions = qtable.GetLength(1);
+            bestActions = Enumerable.Range(0, NumStates).Select(x => (Random.Next(NumActions), -double.MaxValue)).ToArray();
         }
 
         public void Reset(int state)
@@ -41,10 +46,13 @@ namespace QLearning
 
         public int GetGreedyAction(int state)
         {
-            var bestAction = Random.Next(numActions);
+            if (bestActions[state].Action != -1)
+                return bestActions[state].Action;
+
+            var bestAction = Random.Next(NumActions);
             var bestQ = QTable[state, bestAction];
 
-            for (int a = 0; a < numActions; a++)
+            for (int a = 0; a < NumActions; a++)
             {
                 if (QTable[state, a] > bestQ)
                 {
@@ -53,13 +61,14 @@ namespace QLearning
                 }
             }
 
+            bestActions[state] = (bestAction, bestQ);
             return bestAction;
         }
 
         public int GetPolicyAction(int state, int? greedyAction = null)
         {
             if (Random.NextDouble() < Epsilon)
-                return Random.Next(numActions);
+                return Random.Next(NumActions);
             return greedyAction ?? GetGreedyAction(state);
         }
 
@@ -99,12 +108,14 @@ namespace QLearning
             if (TraceType == TraceType.None)
             {
                 QTable[state, action] += Alpha * delta;
+                UpdateBestAction(state, action);
                 return;
             }
 
             foreach (var key in Traces.Keys)
             {
                 QTable[key.State, key.Action] += Alpha * delta * Traces[key];
+                UpdateBestAction(state, action);
                 Traces[key] *= decay;
             }
 
@@ -113,6 +124,14 @@ namespace QLearning
                 foreach (var key in Traces.Where(x => x.Value < TraceThreshold).Select(x => x.Key).ToArray())
                     Traces.Remove(key);
             }
+        }
+
+        private void UpdateBestAction(int state, int action)
+        {
+            if (QTable[state, action] > bestActions[state].QValue)
+                bestActions[state] = (action, QTable[state, action]);
+            else if (bestActions[state].Action == action && QTable[state, action] < bestActions[state].QValue)
+                bestActions[state] = (-1, -double.MaxValue);
         }
 
         public void Reward(int state, int action, double reward)
