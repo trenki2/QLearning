@@ -1,15 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 
 namespace QLearning
 {
     public class QAgent
     {
         public double[,] QTable { get; set; }
-        public Dictionary<(int State, int Action), double> Traces { get; set; } = new();
+        public double[,] Traces { get; set; }
+        public Dictionary<(int State, int Action), double> TracesDict { get; set; } = new();
         public QAlgorithm Algorithm { get; set; }
         public TraceType TraceType { get; set; }
+        public TraceMode TraceMode { get; set; }
         public double TraceThreshold { get; set; } = 1e-4;
         public Random Random { get; set; }
 
@@ -26,11 +30,13 @@ namespace QLearning
         private int updateCount;
         private (int Action, double QValue)[] bestActions;
 
-        public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, TraceType traceType = TraceType.Replacing, Random random = null)
+        public QAgent(double[,] qtable, QAlgorithm algorithm = QAlgorithm.Q, TraceType traceType = TraceType.Replacing, TraceMode traceMode = TraceMode.Matrix, Random random = null)
         {
             QTable = qtable;
+            Traces = new double[qtable.GetLength(0), qtable.GetLength(1)];
             Algorithm = algorithm;
             TraceType = traceType;
+            TraceMode = traceMode;
             Random = random ?? new Random();
             CurrentState = 0;
             NumStates = qtable.GetLength(0);
@@ -41,7 +47,21 @@ namespace QLearning
         public void Reset(int state)
         {
             CurrentState = state;
-            Traces.Clear();
+            ResetTraces();
+        }
+
+        public void ResetTraces()
+        {
+            if (TraceMode == TraceMode.Matrix)
+            {
+                for (int s = 0; s < NumStates; s++)
+                    for (int a = 0; a < NumActions; a++)
+                        Traces[s, a] = 0;
+            }
+            else
+            {
+                TracesDict.Clear();
+            }
         }
 
         public int GetGreedyAction(int state)
@@ -75,7 +95,7 @@ namespace QLearning
         public int Step(int state, int action, double reward, int nextState)
         {
             if (state != CurrentState && TraceType != TraceType.None)
-                Traces.Clear();
+                ResetTraces();
 
             var greedyAction = GetGreedyAction(nextState);
             var policyAction = GetPolicyAction(nextState, greedyAction);
@@ -90,20 +110,15 @@ namespace QLearning
             return policyAction;
         }
 
-        private void Act(int state, int action)
+        public void Act(int state, int action)
         {
             if (TraceType == TraceType.Replacing)
-            {
-                Traces[(state, action)] = 1;
-            }
+                SetTrace(state, action, 1);
             else if (TraceType == TraceType.Accumulating)
-            {
-                Traces.TryGetValue((state, action), out var val);
-                Traces[(state, action)] = val + 1;
-            }
+                AddTrace(state, action, 1);
         }
 
-        private void Update(int state, int action, double delta, double decay)
+        public void Update(int state, int action, double delta, double decay)
         {
             if (TraceType == TraceType.None)
             {
@@ -112,17 +127,83 @@ namespace QLearning
                 return;
             }
 
-            foreach (var key in Traces.Keys)
+            if (TraceMode == TraceMode.Matrix)
             {
-                QTable[key.State, key.Action] += Alpha * delta * Traces[key];
-                UpdateBestAction(state, action);
-                Traces[key] *= decay;
+                for (var s = 0; s < NumStates; s++)
+                {
+                    for (var a = 0; a < NumActions; a++)
+                    {
+                        QTable[s, a] += Alpha * delta * Traces[s, a];
+                        Traces[s, a] *= decay;
+                    }
+                }
             }
-
-            if (++updateCount % 100 == 0)
+            else
             {
-                foreach (var key in Traces.Where(x => x.Value < TraceThreshold).Select(x => x.Key).ToArray())
-                    Traces.Remove(key);
+                foreach (var key in TracesDict.Keys)
+                {
+                    QTable[key.State, key.Action] += Alpha * delta * GetTrace(state, action);
+                    UpdateBestAction(state, action);
+                    MulTrace(state, action, decay);
+                }
+
+                if (++updateCount % 100 == 0)
+                {
+                    foreach (var key in TracesDict.Where(x => x.Value < TraceThreshold).Select(x => x.Key).ToArray())
+                        TracesDict.Remove(key);
+                }
+            }
+        }
+
+        public void Reward(int state, int action, double reward)
+        {
+            Update(state, action, reward, 1.0);
+        }
+
+        private void SetTrace(int state, int action, double value)
+        {
+            if (TraceMode == TraceMode.Matrix)
+                Traces[state, action] = value;
+            else
+                TracesDict[(state, action)] = value;
+        }
+
+        private void AddTrace(int state, int action, double value)
+        {
+            if (TraceMode == TraceMode.Matrix)
+            {
+                Traces[state, action] += value;
+            }
+            else
+            {
+                TracesDict.TryGetValue((state, action), out var val);
+                TracesDict[(state, action)] = val + value;
+            }
+        }
+
+        private void MulTrace(int state, int action, double value)
+        {
+            if (TraceMode == TraceMode.Matrix)
+            {
+                Traces[state, action] *= value;
+            }
+            else
+            {
+                TracesDict.TryGetValue((state, action), out var val);
+                TracesDict[(state, action)] = val * value;
+            }
+        }
+
+        private double GetTrace(int state, int action)
+        {
+            if (TraceMode == TraceMode.Matrix)
+            {
+                return Traces[state, action];
+            }
+            else
+            {
+                TracesDict.TryGetValue((state, action), out var value);
+                return value;
             }
         }
 
@@ -132,11 +213,6 @@ namespace QLearning
                 bestActions[state] = (action, QTable[state, action]);
             else if (bestActions[state].Action == action && QTable[state, action] < bestActions[state].QValue)
                 bestActions[state] = (-1, -double.MaxValue);
-        }
-
-        public void Reward(int state, int action, double reward)
-        {
-            Update(state, action, reward, 1.0);
         }
     }
 }
