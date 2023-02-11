@@ -136,8 +136,8 @@ namespace QLearning
             {
                 foreach (var key in TracesDict.Keys)
                 {
-                    QTable[key.State, key.Action] += Alpha * delta * GetTrace(state, action);
-                    MulTrace(state, action, decay);
+                    QTable[key.State, key.Action] += Alpha * delta * TracesDict[key];
+                    TracesDict[key] *= decay; 
                 }
 
                 if (++updateCount % 100 == 0)
@@ -171,32 +171,6 @@ namespace QLearning
             {
                 TracesDict.TryGetValue((state, action), out var val);
                 TracesDict[(state, action)] = val + value;
-            }
-        }
-
-        private void MulTrace(int state, int action, double value)
-        {
-            if (TraceMode == TraceMode.Matrix)
-            {
-                Traces[state, action] *= value;
-            }
-            else
-            {
-                TracesDict.TryGetValue((state, action), out var val);
-                TracesDict[(state, action)] = val * value;
-            }
-        }
-
-        private double GetTrace(int state, int action)
-        {
-            if (TraceMode == TraceMode.Matrix)
-            {
-                return Traces[state, action];
-            }
-            else
-            {
-                TracesDict.TryGetValue((state, action), out var value);
-                return value;
             }
         }
     }
