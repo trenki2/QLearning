@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
 
 namespace QLearning
 {
@@ -66,9 +64,6 @@ namespace QLearning
 
         public int GetGreedyAction(int state)
         {
-            if (bestActions[state].Action != -1)
-                return bestActions[state].Action;
-
             var bestAction = Random.Next(NumActions);
             var bestQ = QTable[state, bestAction];
 
@@ -123,7 +118,6 @@ namespace QLearning
             if (TraceType == TraceType.None)
             {
                 QTable[state, action] += Alpha * delta;
-                UpdateBestAction(state, action);
                 return;
             }
 
@@ -143,7 +137,6 @@ namespace QLearning
                 foreach (var key in TracesDict.Keys)
                 {
                     QTable[key.State, key.Action] += Alpha * delta * GetTrace(state, action);
-                    UpdateBestAction(state, action);
                     MulTrace(state, action, decay);
                 }
 
@@ -205,14 +198,6 @@ namespace QLearning
                 TracesDict.TryGetValue((state, action), out var value);
                 return value;
             }
-        }
-
-        private void UpdateBestAction(int state, int action)
-        {
-            if (QTable[state, action] > bestActions[state].QValue)
-                bestActions[state] = (action, QTable[state, action]);
-            else if (bestActions[state].Action == action && QTable[state, action] < bestActions[state].QValue)
-                bestActions[state] = (-1, -double.MaxValue);
         }
     }
 }
